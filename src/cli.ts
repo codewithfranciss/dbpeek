@@ -21,9 +21,12 @@ program
       const containers = await engine.discoverDatabases();
       
       if (containers.length === 0) {
-        console.log(CLIFormatter.formatError('No database containers found. Make sure your Docker containers are running.'));
+        console.log(CLIFormatter.formatError('No database containers found. Make sure your Docker containers are running and use images containing "postgres", "mysql", or "mariadb".'));
         return;
       }
+
+      console.log(CLIFormatter.formatSuccess(`Found ${containers.length} database container(s)`));
+
 
       const { containerId } = await inquirer.prompt([
         {
