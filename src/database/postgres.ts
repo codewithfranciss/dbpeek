@@ -38,6 +38,25 @@ export class PostgresInspector {
   }
 
   /**
+   * List all databases in the cluster
+   */
+  async listDatabases(): Promise<string[]> {
+    if (!this.client) throw new Error('Not connected');
+
+    const res = await this.client.query(`
+      SELECT datname 
+      FROM pg_database 
+      WHERE datistemplate = false 
+      AND datname NOT IN ('postgres', 'azure_maintenance', 'azure_sys')
+      ORDER BY datname;
+    `);
+    
+    // Add 'postgres' back if it exists (it was excluded to keep user DBs grouped, but it's a valid DB)
+    const dbs = res.rows.map(r => r.datname);
+    return ['postgres', ...dbs.filter(d => d !== 'postgres')];
+  }
+
+  /**
    * List all user tables in the public schema
    */
   async listTables(): Promise<TableInfo[]> {

@@ -1,7 +1,6 @@
 import { DockerDetector, DBContainerInfo } from '../docker/detector.js';
 import { PostgresInspector, ConnectionConfig } from '../database/postgres.js';
 
-
 export class PeekEngine {
   private detector: DockerDetector;
   private postgres: PostgresInspector;
@@ -17,37 +16,56 @@ export class PeekEngine {
     return list;
   }
 
-
-  async inspectContainer(containerId: string): Promise<{
-    tables: any[];
-    container: DBContainerInfo;
-  }> {
+  async findContainer(containerId: string): Promise<DBContainerInfo> {
     const containers = await this.discoverDatabases();
-    
-    // Robust find: check for full ID match or prefix match (Docker often uses short IDs)
     const container = containers.find(c => 
       c.id === containerId || 
       c.id.startsWith(containerId) || 
       containerId.startsWith(c.id) ||
-      c.name === containerId // Also try matching by name
+      c.name === containerId
     );
-    
-    if (process.env.DEBUG) console.log(`[PeekEngine] Lookup containerId: ${containerId}, Found: ${container?.name || 'Nothing'}`);
     
     if (!container) {
       const availableIds = containers.map(c => c.id).join(', ');
-      throw new Error(`Container with ID "${containerId}" not found. Available database containers: [${availableIds}]`);
+      throw new Error(`Container with ID/name "${containerId}" not found. Available database containers: [${availableIds}]`);
     }
+
+    return container;
+  }
+
+  async discoverDatabasesInContainer(containerId: string): Promise<string[]> {
+    const container = await this.findContainer(containerId);
+    const env = await this.detector.getContainerEnv(container.id);
     
-    const env = await this.detector.getContainerEnv(containerId);
-    
-    // Build connection config
     const config: ConnectionConfig = {
-      host: 'localhost', // Assume localhost for now
+      host: 'localhost',
       port: container.ports[0] || 5432,
       user: env['POSTGRES_USER'] || 'postgres',
       password: env['POSTGRES_PASSWORD'] || '',
-      database: env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
+      database: 'postgres', // Connect to default to list others
+    };
+
+    await this.postgres.connect(config);
+    const dbs = await this.postgres.listDatabases();
+    await this.postgres.disconnect();
+
+    return dbs;
+  }
+
+  async inspectContainer(containerId: string, databaseName?: string): Promise<{
+    tables: any[];
+    container: DBContainerInfo;
+  }> {
+    const container = await this.findContainer(containerId);
+    const env = await this.detector.getContainerEnv(container.id);
+    
+    // Build connection config
+    const config: ConnectionConfig = {
+      host: 'localhost',
+      port: container.ports[0] || 5432,
+      user: env['POSTGRES_USER'] || 'postgres',
+      password: env['POSTGRES_PASSWORD'] || '',
+      database: databaseName || env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
     };
 
     await this.postgres.connect(config);
@@ -57,24 +75,16 @@ export class PeekEngine {
     return { tables, container };
   }
 
-  async getFullSchema(containerId: string, tableName: string) {
-    const containers = await this.discoverDatabases();
-    const container = containers.find(c => 
-      c.id === containerId || 
-      c.id.startsWith(containerId) || 
-      containerId.startsWith(c.id)
-    );
-    
-    if (!container) throw new Error(`Container with ID "${containerId}" no longer found during schema fetch.`);
-    
-    const env = await this.detector.getContainerEnv(containerId);
+  async getFullSchema(containerId: string, tableName: string, databaseName?: string) {
+    const container = await this.findContainer(containerId);
+    const env = await this.detector.getContainerEnv(container.id);
     
     const config: ConnectionConfig = {
       host: 'localhost',
-      port: container?.ports[0] || 5432,
+      port: container.ports[0] || 5432,
       user: env['POSTGRES_USER'] || 'postgres',
       password: env['POSTGRES_PASSWORD'] || '',
-      database: env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
+      database: databaseName || env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
     };
 
     await this.postgres.connect(config);
@@ -85,24 +95,16 @@ export class PeekEngine {
     return { schema, rows };
   }
 
-  async getAllRows(containerId: string, tableName: string) {
-    const containers = await this.discoverDatabases();
-    const container = containers.find(c => 
-      c.id === containerId || 
-      c.id.startsWith(containerId) || 
-      containerId.startsWith(c.id)
-    );
-    
-    if (!container) throw new Error(`Container with ID "${containerId}" no longer found during row fetch.`);
-    
-    const env = await this.detector.getContainerEnv(containerId);
+  async getAllRows(containerId: string, tableName: string, databaseName?: string) {
+    const container = await this.findContainer(containerId);
+    const env = await this.detector.getContainerEnv(container.id);
     
     const config: ConnectionConfig = {
       host: 'localhost',
-      port: container?.ports[0] || 5432,
+      port: container.ports[0] || 5432,
       user: env['POSTGRES_USER'] || 'postgres',
       password: env['POSTGRES_PASSWORD'] || '',
-      database: env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
+      database: databaseName || env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
     };
 
     await this.postgres.connect(config);
@@ -112,4 +114,3 @@ export class PeekEngine {
     return rows;
   }
 }
-

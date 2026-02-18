@@ -27,7 +27,6 @@ program
 
       console.log(CLIFormatter.formatSuccess(`Found ${containers.length} database container(s)`));
 
-
       const { containerId } = await inquirer.prompt([
         {
           type: 'list',
@@ -40,11 +39,25 @@ program
         }
       ]);
 
-      const { tables, container } = await engine.inspectContainer(containerId);
-      console.log(CLIFormatter.formatSuccess(`Connected to ${container.name}`));
+      // Phase 2: Select Database
+      console.log(CLIFormatter.formatSuccess('Scanning for databases in container...'));
+      const databases = await engine.discoverDatabasesInContainer(containerId);
+      
+      const { databaseName } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'databaseName',
+          message: 'Select a database:',
+          choices: databases
+        }
+      ]);
+
+      // Phase 3: Select Table
+      const { tables, container } = await engine.inspectContainer(containerId, databaseName);
+      console.log(CLIFormatter.formatSuccess(`Connected to ${container.name}:${databaseName}`));
 
       if (tables.length === 0) {
-        console.log(CLIFormatter.formatError('No tables found in this database.'));
+        console.log(CLIFormatter.formatError(`No tables found in database "${databaseName}".`));
         return;
       }
 
@@ -57,7 +70,7 @@ program
         }
       ]);
 
-      const { schema, rows } = await engine.getFullSchema(containerId, tableName);
+      const { schema, rows } = await engine.getFullSchema(containerId, tableName, databaseName);
 
       console.log('\n' + CLIFormatter.formatSchemaTable(tableName, schema));
       console.log('\n' + CLIFormatter.formatDataPreview(rows));
@@ -74,7 +87,7 @@ program
 
       if (viewAll) {
         console.log(CLIFormatter.formatWarning('Fetching all rows...'));
-        const allRows = await engine.getAllRows(containerId, tableName);
+        const allRows = await engine.getAllRows(containerId, tableName, databaseName);
         console.log('\n' + CLIFormatter.formatDataPreview(allRows, `All Rows (${allRows.length})`));
       }
 
