@@ -1,4 +1,5 @@
-export * from './docker/detector';
-export * from './database/postgres';
-export * from './core/engine';
+export * from './docker/detector.js';
+export * from './database/postgres.js';
+export * from './core/engine.js';
+
 

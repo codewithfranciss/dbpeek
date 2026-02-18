@@ -1,5 +1,6 @@
-import { DockerDetector, DBContainerInfo } from '../docker/detector';
-import { PostgresInspector, ConnectionConfig } from '../database/postgres';
+import { DockerDetector, DBContainerInfo } from '../docker/detector.js';
+import { PostgresInspector, ConnectionConfig } from '../database/postgres.js';
+
 
 export class PeekEngine {
   private detector: DockerDetector;
@@ -61,4 +62,25 @@ export class PeekEngine {
 
     return { schema, rows };
   }
+
+  async getAllRows(containerId: string, tableName: string) {
+    const env = await this.detector.getContainerEnv(containerId);
+    const containers = await this.discoverDatabases();
+    const container = containers.find(c => c.id === containerId);
+    
+    const config: ConnectionConfig = {
+      host: 'localhost',
+      port: container?.ports[0] || 5432,
+      user: env['POSTGRES_USER'] || 'postgres',
+      password: env['POSTGRES_PASSWORD'] || '',
+      database: env['POSTGRES_DB'] || env['POSTGRES_USER'] || 'postgres',
+    };
+
+    await this.postgres.connect(config);
+    const rows = await this.postgres.getAllRows(tableName);
+    await this.postgres.disconnect();
+
+    return rows;
+  }
 }
+

@@ -2,6 +2,7 @@
   "name": "dbpeek",
   "version": "1.0.0",
   "description": "> A lightweight, zero-config CLI tool and library for inspecting database schemas in Docker containers.",
+  "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -40,10 +41,10 @@
   "devDependencies": {
     "@types/dockerode": "^4.0.1",
     "@types/express": "^5.0.6",
-    "@types/inquirer": "^9.0.9",
     "@types/node": "^25.2.3",
     "@types/pg": "^8.16.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }
+
 }

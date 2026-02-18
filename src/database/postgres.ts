@@ -84,4 +84,15 @@ export class PostgresInspector {
 
     return res.rows;
   }
+
+  /**
+   * Get all rows from a table (Warning: slow for large tables)
+   */
+  async getAllRows(tableName: string): Promise<any[]> {
+    if (!this.client) throw new Error('Not connected');
+
+    const res = await this.client.query(`SELECT * FROM "${tableName}";`);
+    return res.rows;
+  }
 }
+
